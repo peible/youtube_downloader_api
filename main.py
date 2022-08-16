@@ -41,6 +41,7 @@ ydl_opts = {
 
 class Video(BaseModel):
     url: List[str]
+    filter_info: List[str] = None
     quality: str = None
 
 @app.get("/")
@@ -57,13 +58,19 @@ def download(video : Video):
 @app.post("/search")
 def search(video : Video, request : Request):
     with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        video_info = ydl.extract_info('https://youtu.be/taCRBFkUqdM', download=False)
+        video_info = ydl.extract_info(video.url, download=False)
         extracted_info={}
-        for key_info in request.query_params.values():
+        for key_info in video.filter_info:
             if type(video_info.get(key_info)) is str:
                 extracted_info[key_info] = video_info[key_info]
-            else: 
-                # if type(video_info.get(key_info)) is list:
+            else:
                 extracted_info[key_info] = video_info[key_info][-1]
+
+        # for key_info in request.query_params.values():
+        #     if type(video_info.get(key_info)) is str:
+        #         extracted_info[key_info] = video_info[key_info]
+        #     else: 
+        #         # if type(video_info.get(key_info)) is list:
+        #         extracted_info[key_info] = video_info[key_info][-1]
                 
     return extracted_info if extracted_info else video_info
