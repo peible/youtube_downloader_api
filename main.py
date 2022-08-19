@@ -1,16 +1,13 @@
-from queue import Empty
 from typing import List
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
-import youtube_dl, os, shutil, time
+import os, time, yt_dlp
 from zipfile import ZipFile
-
 from pydantic import BaseModel
 
 app = FastAPI()
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
-# ROOT_DIR=os.path.dirname(__file__)
 TMP_DIR = os.path.join(ROOT_DIR, "tmp_download")
 
 class MyLogger(object):
@@ -27,8 +24,6 @@ def my_hook(d):
     if d["status"] == "finished":
         print("Done downloading, now converting ...")
 
-
-
 ydl_opts = {
     "outtmpl": f"{TMP_DIR}{os.path.sep}%(title)s.%(ext)s",
     "logger": MyLogger(),
@@ -43,7 +38,7 @@ class Video(BaseModel):
 
 @app.get("/")
 def index():
-    return {"Lorem": "Ipsum"}
+    return {"Welcome": "Visit /docs"}
 
 @app.post("/download")
 def download(video: Video):
@@ -62,14 +57,7 @@ def download(video: Video):
         ydl_opts["format"] = "bestvideo/best"
         media_type = "video/mp4"
         
-    # if len(video.url) > 1:
-    #     folder_name = int(round(time.time() * 1000))
-    #     os.mkdir(folder_name)
-    #     TMP_DIR = os.path.join(TMP_DIR, folder_name)
-    #     ydl_opts["outtmpl"]= f"{TMP_DIR}{os.path.sep}%(title)s.%(ext)s"
-    #     after looping file-->shutil.make_archive(folder_name, 'zip', TMP_DIR)
-
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         folder_name = int(round(time.time() * 1000))
         with ZipFile(f"{TMP_DIR}{os.path.sep}{folder_name}.zip", "w") as zip:
             for url in video.url:
@@ -83,11 +71,13 @@ def download(video: Video):
 
 @app.post("/search")
 def search(video: Video, request: Request):
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         extracted_info = {}
         for idx, url in enumerate(video.url):
             video_info = ydl.extract_info(url, download=False)
+            print(type(video_info))
             if video.filter_info:
+                extracted_info[idx] = {}
                 for key_info in video.filter_info:
                     if video_info.get(key_info):
                         if type(video_info.get(key_info)) is str:
