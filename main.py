@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import FileResponse
 import os, time, yt_dlp
 from zipfile import ZipFile
@@ -25,23 +25,29 @@ def my_hook(d):
         print("Done downloading, now converting ...")
 
 ydl_opts = {
-    "outtmpl": f"{TMP_DIR}{os.path.sep}%(title)s.%(ext)s",
+    "outtmpl": f"{os.path.join(TMP_DIR, '')}%(title)s.%(ext)s",
     "logger": MyLogger(),
     "progress_hooks": [my_hook],
-    "verbose": True,
+    "verbose": True
 }
 
-class Video(BaseModel):
+class Video_download(BaseModel):
+    url: List[str]
+    quality: str = None
+    format: str
+
+
+class Video_search(BaseModel):
     url: List[str]
     filter_info: List[str] = None
-    format: str = None
 
 @app.get("/")
 def index():
     return {"Welcome": "Visit /docs"}
 
 @app.post("/download")
-def download(video: Video):
+def download(video: Video_download):
+    filename=None
     media_type = None
     if video.format == "mp3":
         ydl_opts["format"] = "bestaudio"
@@ -58,20 +64,27 @@ def download(video: Video):
         media_type = "video/mp4"
         
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        folder_name = int(round(time.time() * 1000))
-        with ZipFile(f"{TMP_DIR}{os.path.sep}{folder_name}.zip", "w") as zip:
-            for url in video.url:
-                video_title = ydl.extract_info(url, download=True)["title"]
-                zip.write(f"{TMP_DIR}{os.path.sep}{video_title}.{video.format}", f"{video_title}.{video.format}")
-                os.remove(f"{TMP_DIR}{os.path.sep}{video_title}.{video.format}")
-        return FileResponse(
-            path=f"{TMP_DIR}{os.path.sep}{folder_name}.zip",
-            filename=f"{folder_name}.zip",
-            media_type=media_type,
-        )
+        if len(video.url) > 1:
+            media_type = "application/zip"
+            filename = f"{int(round(time.time() * 1000))}.zip"
+            
+            with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
+                for url in video.url:
+                    video_title = ydl.extract_info(url, download=True)["title"]
+                    zip.write(os.path.join(TMP_DIR, f"{video_title}.{video.format}"), f"{video_title}.{video.format}")
+                    os.remove(os.path.join(TMP_DIR, f"{video_title}.{video.format}"))
+        else:
+            video_title = ydl.extract_info(video.url[0], download=True)["title"]
+            filename = f"{video_title}.{video.format}"
+
+    return FileResponse(
+        path=os.path.join(TMP_DIR, filename),
+        filename=filename,
+        media_type=media_type
+    )
 
 @app.post("/search")
-def search(video: Video, request: Request):
+def search(video: Video_search):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         extracted_info = {}
         for idx, url in enumerate(video.url):
