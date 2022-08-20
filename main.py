@@ -44,7 +44,7 @@ def index():
 def download(video: Video):
     media_type = None
     if video.format == "mp3":
-        ydl_opts["format"] = "best"
+        ydl_opts["format"] = "bestaudio"
         ydl_opts["postprocessors"] = [
             {
                 "key": "FFmpegExtractAudio",
@@ -54,7 +54,7 @@ def download(video: Video):
         ]
         media_type = "audio/mpeg"
     elif video.format == "mp4":
-        ydl_opts["format"] = "bestvideo/best"
+        ydl_opts["format"] = "best"
         media_type = "video/mp4"
         
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -63,6 +63,7 @@ def download(video: Video):
             for url in video.url:
                 video_title = ydl.extract_info(url, download=True)["title"]
                 zip.write(f"{TMP_DIR}{os.path.sep}{video_title}.{video.format}", f"{video_title}.{video.format}")
+                os.remove(f"{TMP_DIR}{os.path.sep}{video_title}.{video.format}")
         return FileResponse(
             path=f"{TMP_DIR}{os.path.sep}{folder_name}.zip",
             filename=f"{folder_name}.zip",
