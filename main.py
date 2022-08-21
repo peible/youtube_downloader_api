@@ -4,8 +4,17 @@ from fastapi.responses import FileResponse
 import os, time, yt_dlp
 from zipfile import ZipFile
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 TMP_DIR = os.path.join(ROOT_DIR, "tmp_download")
