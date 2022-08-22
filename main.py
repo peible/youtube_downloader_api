@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-import os, time, yt_dlp
+import os, uuid, yt_dlp
 from zipfile import ZipFile
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -76,7 +76,7 @@ def download(video: Video_download):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         if len(video.url) > 1:
             media_type = "application/zip"
-            filename = f"{int(round(time.time() * 1000))}.zip"
+            filename = f"{uuid.uuid4()}.zip"
             
             with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
                 for url in video.url:

@@ -6,4 +6,5 @@ share
 *.cfg
 tmp_download
 script.py
+.gitignore
 __pycache__
