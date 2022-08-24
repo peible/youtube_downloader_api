@@ -16,7 +16,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 TMP_DIR = os.path.join(ROOT_DIR, "tmp_download")
 
@@ -25,10 +24,12 @@ class MyLogger(object):
         print(msg)
 
     def warning(self, msg):
-        print(msg)
+        pass
+        # print(msg)
 
     def error(self, msg):
-        print(msg)
+        pass
+        # print(msg)
 
 def my_hook(d):
     if d["status"] == "finished":
@@ -57,7 +58,6 @@ def index():
 
 @app.post("/download")
 def download(video: Video_download):
-    filename=None
     media_type = None
     if video.format == "mp3":
         ydl_opts["format"] = "bestaudio"
@@ -65,7 +65,7 @@ def download(video: Video_download):
             {
                 "key": "FFmpegExtractAudio",
                 "preferredcodec": "mp3",
-                "preferredquality": "256",
+                "preferredquality": "320",
             }
         ]
         media_type = "audio/mpeg"
@@ -74,18 +74,25 @@ def download(video: Video_download):
         media_type = "video/mp4"
         
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        filename = f"{uuid.uuid4()}.zip"
         if len(video.url) > 1:
             media_type = "application/zip"
-            filename = f"{uuid.uuid4()}.zip"
-            
             with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
                 for url in video.url:
                     video_title = ydl.extract_info(url, download=True)["title"]
                     zip.write(os.path.join(TMP_DIR, f"{video_title}.{video.format}"), f"{video_title}.{video.format}")
                     os.remove(os.path.join(TMP_DIR, f"{video_title}.{video.format}"))
         else:
-            video_title = ydl.extract_info(video.url[0], download=True)["title"]
-            filename = f"{video_title}.{video.format}"
+            if "list" in video.url[0]:
+                media_type = "application/zip"
+                with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
+                    playlist_info = ydl.extract_info(video.url[0], download=True)
+                    for video_title in playlist_info['entries']:
+                        zip.write(os.path.join(TMP_DIR, f"{video_title['title']}.{video.format}"), os.path.join(playlist_info['title'], f"{video_title['title']}.{video.format}"))
+                        os.remove(os.path.join(TMP_DIR, f"{video_title['title']}.{video.format}"))
+            else:
+                video_title = ydl.extract_info(video.url[0], download=True)["title"]
+                filename = f"{video_title}.{video.format}"
 
     return FileResponse(
         path=os.path.join(TMP_DIR, filename),
@@ -99,7 +106,6 @@ def search(video: Video_search):
         extracted_info = {}
         for idx, url in enumerate(video.url):
             video_info = ydl.extract_info(url, download=False)
-            print(type(video_info))
             if video.filter_info:
                 extracted_info[idx] = {}
                 for key_info in video.filter_info:
