@@ -18,10 +18,11 @@ app.add_middleware(
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 TMP_DIR = os.path.join(ROOT_DIR, "tmp_download")
+os.makedirs(TMP_DIR, exist_ok=True)
 
 class MyLogger(object):
     def debug(self, msg):
-        print(msg)
+        pass
 
     def warning(self, msg):
         pass
@@ -32,14 +33,13 @@ class MyLogger(object):
         # print(msg)
 
 def my_hook(d):
-    if d["status"] == "finished":
-        print("Done downloading, now converting ...")
+    pass
 
 ydl_opts = {
     "outtmpl": f"{os.path.join(TMP_DIR, '')}%(title)s.%(ext)s",
     "logger": MyLogger(),
     "progress_hooks": [my_hook],
-    "verbose": True
+    "verbose": False
 }
 
 class Video_download(BaseModel):
@@ -79,17 +79,23 @@ def download(video: Video_download):
             media_type = "application/zip"
             with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
                 for url in video.url:
-                    video_title = ydl.extract_info(url, download=True)["title"]
-                    zip.write(os.path.join(TMP_DIR, f"{video_title}.{video.format}"), f"{video_title}.{video.format}")
-                    os.remove(os.path.join(TMP_DIR, f"{video_title}.{video.format}"))
+                    url_info = ydl.extract_info(url, download=True)
+                    if "list" in url:
+                        for video_info in url_info['entries']:
+                            zip.write(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"), os.path.join(url_info['title'], f"{video_info['title']}.{video.format}"))
+                            os.remove(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"))
+                    else:
+                        video_title = url_info["title"]
+                        zip.write(os.path.join(TMP_DIR, f"{video_title}.{video.format}"), f"{video_title}.{video.format}")
+                        os.remove(os.path.join(TMP_DIR, f"{video_title}.{video.format}"))
         else:
             if "list" in video.url[0]:
                 media_type = "application/zip"
                 with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
                     playlist_info = ydl.extract_info(video.url[0], download=True)
-                    for video_title in playlist_info['entries']:
-                        zip.write(os.path.join(TMP_DIR, f"{video_title['title']}.{video.format}"), os.path.join(playlist_info['title'], f"{video_title['title']}.{video.format}"))
-                        os.remove(os.path.join(TMP_DIR, f"{video_title['title']}.{video.format}"))
+                    for video_info in playlist_info['entries']:
+                        zip.write(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"), os.path.join(playlist_info['title'], f"{video_info['title']}.{video.format}"))
+                        os.remove(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"))
             else:
                 video_title = ydl.extract_info(video.url[0], download=True)["title"]
                 filename = f"{video_title}.{video.format}"
