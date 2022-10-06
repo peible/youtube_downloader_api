@@ -1,10 +1,10 @@
-from typing import List
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-import os, uuid, yt_dlp
-from zipfile import ZipFile
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from typing import List
+from pydantic import BaseModel
+import os, uuid, yt_dlp, time
+from zipfile import ZipFile
 
 app = FastAPI()
 
@@ -74,32 +74,26 @@ def download(video: Video_download):
         media_type = "video/mp4"
         
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        filename = f"{uuid.uuid4()}.zip"
-        if len(video.url) > 1:
+        if len(video.url) == 1 and "list" not in video.url[0]:
+            video_title = ydl.extract_info(video.url[0], download=True)["title"]
+            filename = f"{video_title}.{video.format}"
+        else:
+            filename = f"{uuid.uuid4()}.zip"
             media_type = "application/zip"
             with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
                 for url in video.url:
                     url_info = ydl.extract_info(url, download=True)
                     if "list" in url:
                         for video_info in url_info['entries']:
-                            zip.write(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"), os.path.join(url_info['title'], f"{video_info['title']}.{video.format}"))
-                            os.remove(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"))
+                            downloaded_file = os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}")
+                            if(os.path.isfile(downloaded_file)):
+                                zip.write(downloaded_file, os.path.join(url_info['title'], f"{video_info['title']}.{video.format}"))
+                                os.remove(downloaded_file)
                     else:
                         video_title = url_info["title"]
                         zip.write(os.path.join(TMP_DIR, f"{video_title}.{video.format}"), f"{video_title}.{video.format}")
                         os.remove(os.path.join(TMP_DIR, f"{video_title}.{video.format}"))
-        else:
-            if "list" in video.url[0]:
-                media_type = "application/zip"
-                with ZipFile(os.path.join(TMP_DIR, filename), "w") as zip:
-                    playlist_info = ydl.extract_info(video.url[0], download=True)
-                    for video_info in playlist_info['entries']:
-                        zip.write(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"), os.path.join(playlist_info['title'], f"{video_info['title']}.{video.format}"))
-                        os.remove(os.path.join(TMP_DIR, f"{video_info['title']}.{video.format}"))
-            else:
-                video_title = ydl.extract_info(video.url[0], download=True)["title"]
-                filename = f"{video_title}.{video.format}"
-
+                        
     return FileResponse(
         path=os.path.join(TMP_DIR, filename),
         filename=filename,
@@ -124,3 +118,8 @@ def search(video: Video_search):
                 extracted_info[idx] = video_info
 
     return extracted_info
+
+def clean_download_folder():
+    for file in os.listdir(TMP_DIR):
+        if round(time.time()) - round(os.path.getmtime(os.path.join(TMP_DIR, file))) > 300:
+            os.remove((os.path.join(TMP_DIR, file)))
